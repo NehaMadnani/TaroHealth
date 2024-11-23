@@ -23,10 +23,26 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		0E977DF92CEB45F90062D525 /* Embed ExtensionKit Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(EXTENSIONS_FOLDER_PATH)";
+			dstSubfolderSpec = 16;
+			files = (
+			);
+			name = "Embed ExtensionKit Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		0E74282B2CF188C100634D4D /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
 		0E977D9E2CEAD8800062D525 /* Taro Health.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Taro Health.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		0E977DAE2CEAD8810062D525 /* Taro HealthTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Taro HealthTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		0E977DB82CEAD8810062D525 /* Taro HealthUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Taro HealthUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		0EA5AA2E2CEFF2D4004BC00C /* Taro Health.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Taro Health.entitlements"; sourceTree = "<group>"; };
+		0EA5AA742CEFF5D1004BC00C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -75,6 +91,9 @@
 		0E977D952CEAD8800062D525 = {
 			isa = PBXGroup;
 			children = (
+				0E74282B2CF188C100634D4D /* AppTheme.swift */,
+				0EA5AA742CEFF5D1004BC00C /* Info.plist */,
+				0EA5AA2E2CEFF2D4004BC00C /* Taro Health.entitlements */,
 				0E977DA02CEAD8800062D525 /* Taro Health */,
 				0E977DB12CEAD8810062D525 /* Taro HealthTests */,
 				0E977DBB2CEAD8810062D525 /* Taro HealthUITests */,
@@ -102,6 +121,7 @@
 				0E977D9A2CEAD8800062D525 /* Sources */,
 				0E977D9B2CEAD8800062D525 /* Frameworks */,
 				0E977D9C2CEAD8800062D525 /* Resources */,
+				0E977DF92CEB45F90062D525 /* Embed ExtensionKit Extensions */,
 			);
 			buildRules = (
 			);
@@ -396,13 +416,17 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"Taro Health/Preview Content\"";
+				DEVELOPMENT_TEAM = JM3YZZR35Q;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "/Users/nehasuresh/Desktop/taro/Taro Health/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.1;
+				"IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]" = 18.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -424,13 +448,16 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"Taro Health/Preview Content\"";
+				DEVELOPMENT_TEAM = JM3YZZR35Q;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "/Users/nehasuresh/Desktop/taro/Taro Health/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

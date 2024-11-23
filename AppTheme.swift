@@ -12,7 +12,7 @@ struct AppTheme {
     let primaryGreen = Color("PrimaryGreen")
     
     // Secondary Colors
-    let secondaryBlue = Color("SecondaryBlue")
+    let secondaryprimaryBlack = Color("SecondaryprimaryBlack")
     let secondaryYellow = Color("SecondaryYellow")
     
     // Background
