@@ -9,8 +9,8 @@ struct IngredientAnalysis: Identifiable {
     
     // Helper method to format status for display
     var displayStatus: String {
-        "Taro says \(status)"
-    }
+            status.prefix(1).uppercased() + status.dropFirst()
+        }
     
     // Helper method to format date
     func formattedDate() -> String {
