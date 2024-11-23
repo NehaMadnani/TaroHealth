@@ -11,11 +11,9 @@ enum HealthGoal: String, Codable, CaseIterable {
     case energy = "Having the energy to pursue your passions"
     case independence = "Maintain independence & freedom as you age"
     case loseWeight = "Eat to reach target weight"
-    case buildMuscle = "Nourish and build Muscle"
+    case buildMuscle = "Eat to build Muscle"
     case improveStamina = "Improve Stamina"
     case familyHealth = "Improve overall family health"
-    case immunity = "Support your immune system"
-
 }
 
 struct UserProfile: Codable {
