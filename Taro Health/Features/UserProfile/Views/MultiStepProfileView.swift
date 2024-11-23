@@ -255,6 +255,8 @@ struct MultiStepUserProfileView: View {
     @State private var isProfileComplete = false
     @State private var alertItem: AlertItem?
     @State private var navigateToScanner = false
+    @State private var customAllergy = ""
+    @State private var customAllergies: Set<String> = []
     
 
 
@@ -430,21 +432,85 @@ struct MultiStepUserProfileView: View {
     }
     
     private var allergiesView: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-            ForEach(allergiesList, id: \.self) { allergy in
-                ToggleButton(
-                    title: allergy,
-                    isSelected: selectedAllergies.contains(allergy),
-                    action: {
-                        if selectedAllergies.contains(allergy) {
-                            selectedAllergies.remove(allergy)
-                        } else {
-                            selectedAllergies.insert(allergy)
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Common Allergies")
+                .font(.headline)
+                .padding(.bottom, 5)
+            
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                ForEach(allergiesList, id: \.self) { allergy in
+                    ToggleButton(
+                        title: allergy,
+                        isSelected: selectedAllergies.contains(allergy),
+                        action: {
+                            if selectedAllergies.contains(allergy) {
+                                selectedAllergies.remove(allergy)
+                            } else {
+                                selectedAllergies.insert(allergy)
+                            }
                         }
+                    )
+                }
+            }
+            
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Other Allergies")
+                    .font(.headline)
+                    .padding(.top, 10)
+                
+                HStack {
+                    TextField("Enter allergy", text: $customAllergy)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                    
+                    Button(action: addCustomAllergy) {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundColor(.primaryBlack)
+                            .font(.system(size: 24))
                     }
-                )
+                    .disabled(customAllergy.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+                
+                if !customAllergies.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(Array(customAllergies), id: \.self) { allergy in
+                                HStack {
+                                    Text(allergy)
+                                        .padding(.leading, 8)
+                                    
+                                    Button(action: {
+                                        removeCustomAllergy(allergy)
+                                    }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundColor(.gray)
+                                    }
+                                    .padding(.trailing, 4)
+                                }
+                                .padding(.vertical, 6)
+                                .background(Color.gray.opacity(0.1))
+                                .cornerRadius(16)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
             }
         }
+    }
+
+    // Add these helper functions inside MultiStepUserProfileView
+    private func addCustomAllergy() {
+        let trimmedAllergy = customAllergy.trimmingCharacters(in: .whitespaces)
+        if !trimmedAllergy.isEmpty {
+            customAllergies.insert(trimmedAllergy)
+            selectedAllergies.insert(trimmedAllergy)
+            customAllergy = ""
+        }
+    }
+
+    private func removeCustomAllergy(_ allergy: String) {
+        customAllergies.remove(allergy)
+        selectedAllergies.remove(allergy)
     }
     
     private var medicationsView: some View {
@@ -577,6 +643,9 @@ struct MultiStepUserProfileView: View {
                 return false
             }
             return true
+        case .allergies:
+                let totalAllergies = selectedAllergies.union(customAllergies)
+            return true
             
         default:
             return true
@@ -708,23 +777,21 @@ struct MultiStepUserProfileView: View {
 //        }
     
     private func completeProfile() {
-        let selectedIngredients = ingredientsToAvoid.filter { $0.isSelected }
-        
         let profile = UserProfile(
             fullName: name,
             username: "@\(name.lowercased().replacingOccurrences(of: " ", with: ""))",
             age: Int(age) ?? 0,
             gender: selectedGender,
             healthGoals: selectedHealthGoals,
-            allergies: selectedAllergies,
+            allergies: selectedAllergies.union(customAllergies), // Combined set of all allergies
             currentMedications: medication.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) },
             blacklistedItems: selectedBlacklistedItems,
             profileImageData: profileImage?.jpegData(compressionQuality: 0.7),
-            profileImageUrl: nil  // Add this if required
+            profileImageUrl: nil
         )
         
         viewModel.saveProfile(profile)
-        isProfileComplete = true  // This will trigger the navigation
+        isProfileComplete = true
     }
     
     struct ProfileImageSelector: View {
