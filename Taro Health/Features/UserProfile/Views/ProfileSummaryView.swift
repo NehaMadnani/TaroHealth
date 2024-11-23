@@ -58,11 +58,13 @@ struct ProfileSummaryView: View {
                     FlowLayout(alignment: .leading, spacing: 8) {
                         ForEach(Array(userProfile.healthGoals), id: \.self) { goal in
                             Text(goal.rawValue)
-                                .padding(.horizontal, 12)
+                                .fixedSize(horizontal: false, vertical: false) // Enable text wrapping
+                                .padding(.horizontal, 6)
                                 .padding(.vertical, 6)
                                 .background(Color.primaryBlack.opacity(0.1))
                                 .foregroundColor(.primaryBlack)
                                 .cornerRadius(8)
+                                .font(.custom("Poppins-Medium", size: 12))
                         }
                     }
                 }

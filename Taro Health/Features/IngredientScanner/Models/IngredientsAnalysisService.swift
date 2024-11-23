@@ -23,7 +23,8 @@ class IngredientsAnalysisService {
     func fetchIngredientsToAvoid(
         dietary: Set<String>,
         health: Set<HealthGoal>,
-        allergies: Set<String>
+        allergies: Set<String>,
+        name: String
     ) async throws -> BlacklistResponse {
         guard let url = URL(string: "\(baseURL)/analyze") else {
             logger.error("❌ Invalid URL: \(self.baseURL)/analyze")
@@ -31,8 +32,10 @@ class IngredientsAnalysisService {
         }
         
         var request = URLRequest(url: url)
+        print(name)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(name, forHTTPHeaderField: "X-User-Id")  // Add this line
         request.timeoutInterval = 30 // 30 seconds timeout
         
         let healthStrings = health.map { $0.rawValue }

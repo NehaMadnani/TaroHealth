@@ -38,7 +38,6 @@ struct BlacklistResponse: Codable {
     let blacklist: [BlacklistItem]
 }
 
-// Update the IngredientToAvoid model
 struct IngredientToAvoid: Identifiable {
     let id = UUID()
     let name: String
@@ -47,8 +46,27 @@ struct IngredientToAvoid: Identifiable {
     var isSelected: Bool
     var isExpanded: Bool
     var selectedAliases: Set<String>
+    
+    // Computed property to determine selection state
+    var selectionState: SelectionState {
+        if selectedAliases.isEmpty {
+            return .none
+        } else if selectedAliases.count == aliases.count {
+            return .all
+        } else {
+            return .partial
+        }
+    }
 }
 
+enum SelectionState {
+    case none
+    case partial
+    case all
+}
+
+
+// Create a reusable pill view for aliases
 struct AliasPill: View {
     let alias: String
     var isSelected: Bool
@@ -66,6 +84,110 @@ struct AliasPill: View {
         }
     }
 }
+
+
+// Main ingredient card view
+struct IngredientCard: View {
+    @Binding var ingredient: IngredientToAvoid
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header/Main toggle
+            Button(action: {
+                withAnimation {
+                    ingredient.isExpanded.toggle()
+                }
+            }) {
+                HStack(alignment: .top, spacing: 12) {
+                    // Main toggle
+                    Toggle("", isOn: Binding(
+                        get: { ingredient.selectionState == .all },
+                        set: { newValue in
+                            ingredient.selectedAliases = newValue ? Set(ingredient.aliases) : Set()
+                            ingredient.isSelected = newValue
+                        }
+                    ))
+                    .labelsHidden()
+                    
+                    // Title, subtitle, and selection status
+                    VStack(alignment: .leading, spacing: 4) {
+                            Text(ingredient.name)
+                                .font(.system(.body, design: .rounded))
+                                .fontWeight(.medium)
+                            
+                            Text(ingredient.reason)
+                                .font(.system(size: 12))
+                                .foregroundColor(.gray)
+                                .frame(height: 16) // Fixed height for consistent layout
+                            
+                            if !ingredient.selectedAliases.isEmpty && ingredient.selectedAliases.count < ingredient.aliases.count {
+                                Text("Some aliases selected")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.orange)
+                                    .frame(height: 16) // Fixed height for consistent layout
+                            }
+                        }
+                    
+                    Spacer()
+                    
+                    Image(systemName: ingredient.isExpanded ? "chevron.up" : "chevron.down")
+                        .foregroundColor(.gray)
+                }
+            }
+            .padding()
+            .background(backgroundColor)
+            .foregroundColor(ingredient.selectionState == .all ? .white : .primary)
+            
+            // Expanded content with aliases
+            if ingredient.isExpanded {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Common forms and aliases:")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .padding(.horizontal)
+                        .padding(.top)
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        LazyHStack(spacing: 8) {
+                            ForEach(ingredient.aliases, id: \.self) { alias in
+                                AliasPill(
+                                    alias: alias,
+                                    isSelected: ingredient.selectedAliases.contains(alias)
+                                ) {
+                                    toggleAlias(alias)
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                    .padding(.bottom)
+                }
+                .background(Color(.systemGray6))
+            }
+        }
+        .cornerRadius(10)
+    }
+    
+    private var backgroundColor: Color {
+        switch ingredient.selectionState {
+        case .all:
+            return .primaryBlack
+        case .partial:
+            return Color(.systemGray5)
+        case .none:
+            return Color(.systemGray6)
+        }
+    }
+    
+    private func toggleAlias(_ alias: String) {
+        if ingredient.selectedAliases.contains(alias) {
+            ingredient.selectedAliases.remove(alias)
+        } else {
+            ingredient.selectedAliases.insert(alias)
+        }
+    }
+}
+
 
 // First, create a new model to hold both title parts
 struct IngredientTitle {
@@ -373,18 +495,8 @@ struct MultiStepUserProfileView: View {
                         }
                     }
                     
-                    LazyVGrid(columns: [GridItem(.flexible())], spacing: 10) {
-                        ForEach(ingredientsToAvoid) { ingredient in
-                            ToggleButton(
-                                ingredientTitle: IngredientTitle(
-                                    name: ingredient.name,
-                                    reason: ingredient.reason
-                                ),
-                                isSelected: isIngredientSelected(ingredient),
-                                action: { toggleIngredient(ingredient) }
-                            )
-                            .padding(.horizontal, 8)
-                        }
+                    ForEach($ingredientsToAvoid) { $ingredient in
+                        IngredientCard(ingredient: $ingredient)
                     }
                 }
             }
@@ -406,7 +518,13 @@ struct MultiStepUserProfileView: View {
         selectAllIngredients.toggle()
         ingredientsToAvoid = ingredientsToAvoid.map { ingredient in
             var updatedIngredient = ingredient
-            updatedIngredient.isSelected = selectAllIngredients
+            if selectAllIngredients {
+                updatedIngredient.selectedAliases = Set(ingredient.aliases)
+                updatedIngredient.isSelected = true
+            } else {
+                updatedIngredient.selectedAliases.removeAll()
+                updatedIngredient.isSelected = false
+            }
             return updatedIngredient
         }
     }
@@ -485,7 +603,9 @@ struct MultiStepUserProfileView: View {
                 let response = try await ingredientsService.fetchIngredientsToAvoid(
                     dietary: selectedBlacklistedItems,
                     health: selectedHealthGoals,
-                    allergies: selectedAllergies
+                    allergies: selectedAllergies,
+                    name: name
+                    
                 )
                 
                 // Update UI on main thread

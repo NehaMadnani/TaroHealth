@@ -78,9 +78,31 @@ struct ScannerView: View {
     private func handleCapture() {
         scannerService.captureAndAnalyze { recognizedText in
             if let text = recognizedText {
-                let analysis = analyzer.analyzeIngredients(text)
-                analysisResult = analysis
-                showingResults = true
+                Task {
+                    do {
+                        let analysis = try await analyzer.analyzeIngredients(text)
+                        // Since we're updating UI state, ensure we're on the main thread
+                        await MainActor.run {
+                            self.analysisResult = analysis
+                            self.showingResults = true
+                        }
+                    } catch {
+                        // Handle specific API errors if needed
+                        await MainActor.run {
+                            switch error {
+                            case APIError.networkError:
+                                self.errorMessage = "Network error. Please check your connection and try again."
+                            case APIError.serverError:
+                                self.errorMessage = "Server error. Please try again later."
+                            case APIError.invalidResponse, APIError.decodingError:
+                                self.errorMessage = "Error processing the response. Please try again."
+                            default:
+                                self.errorMessage = error.localizedDescription
+                            }
+                            self.showingError = true
+                        }
+                    }
+                }
             } else {
                 errorMessage = "Failed to recognize text from the image. Please try again."
                 showingError = true
@@ -89,86 +111,3 @@ struct ScannerView: View {
     }
 }
 
-// Original ResultsView remains unchanged
-struct ResultsView: View {
-    let analysis: IngredientAnalysis
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    // Safety Status
-                    HStack {
-                        Image(systemName: analysis.isSafe ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                            .foregroundColor(analysis.isSafe ? .green : .red)
-                            .font(.title)
-                        
-                        Text(analysis.isSafe ? "Safe to Consume" : "Use Caution")
-                            .font(.title2)
-                            .bold()
-                    }
-                    
-                    // Health Score
-                    VStack(alignment: .leading) {
-                        Text("Health Score")
-                            .font(.headline)
-                        
-                        HStack {
-                            Text("\(analysis.healthScore)")
-                                .font(.system(size: 48))
-                                .bold()
-                            Text("/ 10")
-                                .font(.title)
-                                .foregroundColor(.gray)
-                        }
-                    }
-                    
-                    // Warnings
-                    if !analysis.warnings.isEmpty {
-                        VStack(alignment: .leading) {
-                            Text("Warnings")
-                                .font(.headline)
-                            
-                            ForEach(analysis.warnings, id: \.self) { warning in
-                                HStack {
-                                    Image(systemName: "exclamationmark.triangle.fill")
-                                        .foregroundColor(.yellow)
-                                    Text(warning)
-                                }
-                                .padding(.vertical, 4)
-                            }
-                        }
-                    }
-                    
-                    // Flagged Ingredients
-                    if !analysis.flaggedIngredients.isEmpty {
-                        VStack(alignment: .leading) {
-                            Text("Flagged Ingredients")
-                                .font(.headline)
-                            
-                            ForEach(analysis.flaggedIngredients, id: \.self) { ingredient in
-                                HStack {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(.red)
-                                    Text(ingredient)
-                                }
-                                .padding(.vertical, 4)
-                            }
-                        }
-                    }
-                }
-                .padding()
-            }
-            .navigationTitle("Analysis Results")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-}
