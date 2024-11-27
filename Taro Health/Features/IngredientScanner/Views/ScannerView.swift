@@ -18,7 +18,6 @@ struct CameraPreviewView: UIViewRepresentable {
     
     func updateUIView(_ uiView: UIView, context: Context) {}
 }
-
 struct ScannerView: View {
     let userProfile: UserProfile
     
@@ -37,14 +36,12 @@ struct ScannerView: View {
     
     var body: some View {
         ZStack {
-            // Camera preview
             CameraPreviewView(scannerService: scannerService)
                 .edgesIgnoringSafeArea(.all)
             
             VStack {
                 Spacer()
                 
-                // Capture button
                 Button(action: handleCapture) {
                     Circle()
                         .fill(Color.white)
@@ -76,38 +73,56 @@ struct ScannerView: View {
     }
     
     private func handleCapture() {
-        scannerService.captureAndAnalyze { recognizedText in
-            if let text = recognizedText {
-                Task {
-                    do {
-                        let analysis = try await analyzer.analyzeIngredients(text)
-                        // Since we're updating UI state, ensure we're on the main thread
-                        await MainActor.run {
-                            self.analysisResult = analysis
-                            self.showingResults = true
-                        }
-                    } catch {
-                        // Handle specific API errors if needed
-                        await MainActor.run {
-                            switch error {
-                            case APIError.networkError:
-                                self.errorMessage = "Network error. Please check your connection and try again."
-                            case APIError.serverError:
-                                self.errorMessage = "Server error. Please try again later."
-                            case APIError.invalidResponse, APIError.decodingError:
-                                self.errorMessage = "Error processing the response. Please try again."
-                            default:
-                                self.errorMessage = error.localizedDescription
-                            }
-                            self.showingError = true
-                        }
+        scannerService.captureAndAnalyze { recognizedText, imageData in
+            Task {
+                do {
+                    let analysis: IngredientAnalysis
+                    
+                    if let text = recognizedText, !text.isEmpty {
+                        // Flow 1: Text detected
+                        analysis = try await analyzer.analyzeIngredients(text)
+                    } else if let imageData = imageData {
+                        // Flow 2: No text detected, use image
+                        let base64String = imageData.base64EncodedString()
+                        let imageType = getImageType(from: imageData)
+                        
+                        let requestBody: [String: Any] = [
+                            "image": [
+                                "type": imageType,
+                                "data": base64String
+                            ]
+                        ]
+                        
+                        analysis = try await analyzer.analyzeIngredients(requestBody)
+                    } else {
+                        throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to capture image or text"])
+                    }
+                    
+                    await MainActor.run {
+                        self.analysisResult = analysis
+                        self.showingResults = true
+                    }
+                } catch {
+                    await MainActor.run {
+                        self.errorMessage = error.localizedDescription
+                        self.showingError = true
                     }
                 }
-            } else {
-                errorMessage = "Failed to recognize text from the image. Please try again."
-                showingError = true
             }
         }
     }
+    
+    private func getImageType(from imageData: Data) -> String {
+        let bytes = [UInt8](imageData)
+        
+        if bytes.starts(with: [0xFF, 0xD8, 0xFF]) {
+            return "jpeg"
+        } else if bytes.starts(with: [0x89, 0x50, 0x4E, 0x47]) {
+            return "png"
+        } else if bytes.starts(with: [0x47, 0x49, 0x46, 0x38]) {
+            return "gif"
+        } else {
+            return "unknown"
+        }
+    }
 }
-

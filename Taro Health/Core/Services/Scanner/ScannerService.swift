@@ -13,7 +13,7 @@ class ScannerService: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate 
     private var session: AVCaptureSession
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private let output = AVCapturePhotoOutput()
-    private var completionHandler: ((String?) -> Void)?
+    private var completionHandler: ((String?, Data?) -> Void)?
     
     override init() {
         self.session = AVCaptureSession()
@@ -22,10 +22,8 @@ class ScannerService: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate 
     }
     
     private func setupCamera() {
-        // Configure capture session
         session.sessionPreset = AVCaptureSession.Preset.high
         
-        // Get camera device
         guard let videoDevice = AVCaptureDevice.default(.builtInWideAngleCamera,
                                                       for: .video,
                                                       position: .back) else {
@@ -33,13 +31,11 @@ class ScannerService: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate 
             return
         }
         
-        // Create input
         guard let videoInput = try? AVCaptureDeviceInput(device: videoDevice) else {
             self.error = "Could not create video input"
             return
         }
         
-        // Add inputs and outputs
         if session.canAddInput(videoInput) {
             session.addInput(videoInput)
         }
@@ -48,13 +44,11 @@ class ScannerService: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate 
             session.addOutput(output)
         }
         
-        // Create and configure preview layer
         let previewLayer = AVCaptureVideoPreviewLayer(session: session)
         previewLayer.videoGravity = .resizeAspectFill
         previewLayer.connection?.videoOrientation = .portrait
         self.previewLayer = previewLayer
         
-        // Start session
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             self?.session.startRunning()
         }
@@ -80,18 +74,17 @@ class ScannerService: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate 
         }
     }
     
-    func captureAndAnalyze(completion: @escaping (String?) -> Void) {
+    func captureAndAnalyze(completion: @escaping (String?, Data?) -> Void) {
         self.completionHandler = completion
         let settings = AVCapturePhotoSettings()
         output.capturePhoto(with: settings, delegate: self)
     }
     
-    // MARK: - AVCapturePhotoCaptureDelegate
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         if let error = error {
             DispatchQueue.main.async {
                 self.error = error.localizedDescription
-                self.completionHandler?(nil)
+                self.completionHandler?(nil, nil)
             }
             return
         }
@@ -100,7 +93,7 @@ class ScannerService: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate 
               let image = UIImage(data: imageData) else {
             DispatchQueue.main.async {
                 self.error = "Could not process captured image"
-                self.completionHandler?(nil)
+                self.completionHandler?(nil, nil)
             }
             return
         }
@@ -109,11 +102,10 @@ class ScannerService: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate 
             self.capturedImage = image
         }
         
-        // Perform text recognition
         recognizeText(in: image) { [weak self] recognizedText in
             DispatchQueue.main.async {
                 self?.lastRecognizedText = recognizedText
-                self?.completionHandler?(recognizedText)
+                self?.completionHandler?(recognizedText, imageData)
             }
         }
     }
@@ -124,10 +116,8 @@ class ScannerService: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate 
             return
         }
         
-        // Create request handler
         let requestHandler = VNImageRequestHandler(cgImage: cgImage, options: [:])
         
-        // Create text recognition request
         let request = VNRecognizeTextRequest { request, error in
             if let error = error {
                 print("Text recognition error: \(error)")
@@ -135,7 +125,6 @@ class ScannerService: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate 
                 return
             }
             
-            // Process results
             guard let observations = request.results as? [VNRecognizedTextObservation] else {
                 completion(nil)
                 return
@@ -149,11 +138,9 @@ class ScannerService: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate 
             completion(fullText)
         }
         
-        // Configure the recognition level
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true
         
-        // Perform request
         do {
             try requestHandler.perform([request])
         } catch {

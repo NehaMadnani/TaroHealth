@@ -1,4 +1,3 @@
-
 import Foundation
 import os
 
@@ -11,19 +10,23 @@ class IngredientAnalyzerService {
         self.userProfile = userProfile
     }
     
-    func analyzeIngredients(_ ingredientsText: String) async throws -> IngredientAnalysis {
-        // Log the input text
-        print("🔍 Input text to analyze: \(ingredientsText)")
-        
-        let ingredients = ingredientsText
+    func analyzeIngredients(_ input: Any) async throws -> IngredientAnalysis {
+        if let textInput = input as? String {
+            return try await analyzeText(textInput)
+        } else if let requestBody = input as? [String: Any] {
+            return try await analyzeImage(requestBody)
+        } else {
+            throw APIError.invalidInput
+        }
+    }
+    
+    private func analyzeText(_ text: String) async throws -> IngredientAnalysis {
+        let ingredients = text
             .lowercased()
             .components(separatedBy: .whitespacesAndNewlines)
             .joined(separator: " ")
-            
-        print("📝 Processed ingredients text: \(ingredients)")
         
-        guard let url = URL(string: "\(self.baseURL)/analyze-text") else {
-            print("❌ Invalid URL: \(self.baseURL)/analyze-text")
+        guard let url = URL(string: "\(baseURL)/analyze-text") else {
             throw APIError.invalidURL
         }
         
@@ -32,68 +35,64 @@ class IngredientAnalyzerService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(userProfile.fullName, forHTTPHeaderField: "X-User-Id")
         
-        // Create and log request body
         let requestBody = ["text": ingredients]
         request.httpBody = try JSONEncoder().encode(requestBody)
         
-        // Log the complete request details
-        print("\n📡 API Request Details:")
-        print("URL: \(url.absoluteString)")
-        print("Method: \(request.httpMethod ?? "Unknown")")
-        print("Headers: \(request.allHTTPHeaderFields ?? [:])")
-        if let bodyData = request.httpBody,
-           let bodyString = String(data: bodyData, encoding: .utf8) {
-            print("Body: \(bodyString)")
+        return try await performRequest(request)
+    }
+    
+    private func analyzeImage(_ requestBody: [String: Any]) async throws -> IngredientAnalysis {
+        guard let url = URL(string: "\(baseURL)/analyze-text") else {
+            throw APIError.invalidURL
         }
         
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            
-            // Log the response
-            print("\n📥 API Response:")
-            if let responseString = String(data: data, encoding: .utf8) {
-                print("Response Data: \(responseString)")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(userProfile.fullName, forHTTPHeaderField: "X-User-Id")
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+        
+        return try await performRequest(request)
+    }
+    
+    private func performRequest(_ request: URLRequest) async throws -> IngredientAnalysis {
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        
+        switch httpResponse.statusCode {
+        case 200...299:
+            let decoder = JSONDecoder()
+            do {
+                let analysisResponse = try decoder.decode(AnalysisResponse.self, from: data)
+                return IngredientAnalysis(
+                    status: analysisResponse.status,
+                    summary: analysisResponse.summary
+                )
+            } catch {
+                logger.error("Decoding error: \(error.localizedDescription)")
+                throw APIError.decodingError(error)
             }
-            
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw APIError.invalidResponse
-            }
-            
-            print("Status Code: \(httpResponse.statusCode)")
-            
-            switch httpResponse.statusCode {
-            case 200...299:
-                let decoder = JSONDecoder()
-                do {
-                    let analysisResponse = try decoder.decode(AnalysisResponse.self, from: data)
-                    return IngredientAnalysis(
-                        status: analysisResponse.status,
-                        summary: analysisResponse.summary
-                    )
-                } catch {
-                    print("❌ Decoding error: \(error)")
-                    if let responseString = String(data: data, encoding: .utf8) {
-                        print("Raw response that failed to decode: \(responseString)")
-                    }
-                    throw APIError.decodingError(error)
-                }
-            default:
-                throw APIError.serverError(httpResponse.statusCode)
-            }
-        } catch {
-            print("❌ Network error: \(error)")
-            throw APIError.networkError(error)
+        default:
+            throw APIError.serverError(httpResponse.statusCode)
         }
     }
 }
-// Add these structures for API interaction
+
+// Update APIError enum
 enum APIError: Error {
     case invalidURL
     case networkError(Error)
     case invalidResponse
     case serverError(Int)
     case decodingError(Error)
+    case invalidInput
 }
+
+// Keep existing error and response structures
 
 struct AnalysisResponse: Codable {
     let summary: String
