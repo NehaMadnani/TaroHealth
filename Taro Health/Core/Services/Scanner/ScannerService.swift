@@ -15,6 +15,7 @@ class ScannerService: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate 
     private let output = AVCapturePhotoOutput()
     private var completionHandler: ((String?, Data?) -> Void)?
     
+    
     override init() {
         self.session = AVCaptureSession()
         super.init()
@@ -25,8 +26,8 @@ class ScannerService: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate 
         session.sessionPreset = AVCaptureSession.Preset.high
         
         guard let videoDevice = AVCaptureDevice.default(.builtInWideAngleCamera,
-                                                      for: .video,
-                                                      position: .back) else {
+                                                        for: .video,
+                                                        position: .back) else {
             self.error = "No camera available"
             return
         }
@@ -75,41 +76,43 @@ class ScannerService: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate 
     }
     
     func captureAndAnalyze(completion: @escaping (String?, Data?) -> Void) {
-        self.completionHandler = completion
-        let settings = AVCapturePhotoSettings()
-        output.capturePhoto(with: settings, delegate: self)
+            self.completionHandler = completion
+            let settings = AVCapturePhotoSettings()
+            output.capturePhoto(with: settings, delegate: self)
+        }
+        
+        func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
+            if let error = error {
+                DispatchQueue.main.async {
+                    self.error = error.localizedDescription
+                    self.completionHandler?(nil, nil)
+                }
+                return
+            }
+            
+            guard let imageData = photo.fileDataRepresentation(),
+                  let image = UIImage(data: imageData) else {
+                DispatchQueue.main.async {
+                    self.error = "Could not process captured image"
+                    self.completionHandler?(nil, nil)
+                }
+                return
+            }
+            
+            DispatchQueue.main.async {
+                self.capturedImage = image
+            }
+            
+            // Perform text recognition
+            recognizeText(in: image) { [weak self] recognizedText in
+                DispatchQueue.main.async {
+                    self?.lastRecognizedText = recognizedText
+                    self?.completionHandler?(recognizedText, imageData)
+                }
+            }
+        }
     }
-    
-    func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        if let error = error {
-            DispatchQueue.main.async {
-                self.error = error.localizedDescription
-                self.completionHandler?(nil, nil)
-            }
-            return
-        }
-        
-        guard let imageData = photo.fileDataRepresentation(),
-              let image = UIImage(data: imageData) else {
-            DispatchQueue.main.async {
-                self.error = "Could not process captured image"
-                self.completionHandler?(nil, nil)
-            }
-            return
-        }
-        
-        DispatchQueue.main.async {
-            self.capturedImage = image
-        }
-        
-        recognizeText(in: image) { [weak self] recognizedText in
-            DispatchQueue.main.async {
-                self?.lastRecognizedText = recognizedText
-                self?.completionHandler?(recognizedText, imageData)
-            }
-        }
-    }
-    
+
     private func recognizeText(in image: UIImage, completion: @escaping (String?) -> Void) {
         guard let cgImage = image.cgImage else {
             completion(nil)
@@ -148,4 +151,4 @@ class ScannerService: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate 
             completion(nil)
         }
     }
-}
+

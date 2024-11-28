@@ -5,6 +5,7 @@ class IngredientAnalyzerService {
     private let userProfile: UserProfile
     private let baseURL = "https://f2ef-50-175-245-62.ngrok-free.app/api"
     private let logger = Logger(subsystem: "com.taro.health", category: "IngredientAnalysis")
+    public let offlineCache = OfflineCacheService() // Move it here as a stored property
     
     init(userProfile: UserProfile) {
         self.userProfile = userProfile
@@ -12,7 +13,18 @@ class IngredientAnalyzerService {
     
     func analyzeIngredients(_ input: Any) async throws -> IngredientAnalysis {
         if let textInput = input as? String {
-            return try await analyzeText(textInput)
+            do {
+                return try await analyzeText(textInput)
+            } catch let error as URLError where error.code == .notConnectedToInternet {
+                if let offlineAnalysis = analyzeIngredientsOffline(textInput) {
+                    logger.info("✅ Successfully performed offline analysis")
+                    return offlineAnalysis
+                } else {
+                    throw APIError.networkError(error)
+                }
+            } catch {
+                throw error
+            }
         } else if let requestBody = input as? [String: Any] {
             return try await analyzeImage(requestBody)
         } else {

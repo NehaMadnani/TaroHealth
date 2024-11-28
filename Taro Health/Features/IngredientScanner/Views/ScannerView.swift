@@ -18,16 +18,17 @@ struct CameraPreviewView: UIViewRepresentable {
     
     func updateUIView(_ uiView: UIView, context: Context) {}
 }
+
 struct ScannerView: View {
     let userProfile: UserProfile
-    
+    let analyzer: IngredientAnalyzerService
     @StateObject private var scannerService = ScannerService()
+    @State private var showingPermissionAlert = false
+    @State private var permissionStatus = "Not Determined"
     @State private var analysisResult: IngredientAnalysis?
     @State private var showingResults = false
-    @State private var showingError = false
     @State private var errorMessage = ""
-    
-    private let analyzer: IngredientAnalyzerService
+    @State private var showingError = false
     
     init(userProfile: UserProfile) {
         self.userProfile = userProfile
@@ -40,6 +41,13 @@ struct ScannerView: View {
                 .edgesIgnoringSafeArea(.all)
             
             VStack {
+                Text("Camera: \(permissionStatus)")
+                    .padding()
+                    .background(Color.black.opacity(0.7))
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+                    .padding(.top)
+                
                 Spacer()
                 
                 Button(action: handleCapture) {
@@ -54,21 +62,54 @@ struct ScannerView: View {
                 .padding(.bottom, 30)
             }
         }
-        .sheet(isPresented: $showingResults) {
-            if let analysis = analysisResult {
-                ResultsView(analysis: analysis)
+        .onAppear {
+            checkCameraPermission()
+        }
+        .alert("Camera Permission Required", isPresented: $showingPermissionAlert) {
+            Button("Open Settings", role: .none) {
+                if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(settingsURL)
+                }
             }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Please enable camera access in Settings to use the scanner.")
         }
         .alert("Error", isPresented: $showingError) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(errorMessage)
         }
-        .onAppear {
-            scannerService.startScanning()
+        .sheet(isPresented: $showingResults) {
+            if let result = analysisResult {
+                ResultsView(analysis: result)
+            }
         }
-        .onDisappear {
-            scannerService.stopScanning()
+    }
+    
+    private func checkCameraPermission() {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            permissionStatus = "Authorized"
+            scannerService.startScanning()
+        case .notDetermined:
+            permissionStatus = "Not Determined"
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                DispatchQueue.main.async {
+                    permissionStatus = granted ? "Authorized" : "Denied"
+                    if granted {
+                        scannerService.startScanning()
+                    } else {
+                        showingPermissionAlert = true
+                    }
+                }
+            }
+        case .denied, .restricted:
+            permissionStatus = "Denied"
+            showingPermissionAlert = true
+        @unknown default:
+            permissionStatus = "Unknown"
+            showingPermissionAlert = true
         }
     }
     
@@ -76,53 +117,38 @@ struct ScannerView: View {
         scannerService.captureAndAnalyze { recognizedText, imageData in
             Task {
                 do {
-                    let analysis: IngredientAnalysis
-                    
                     if let text = recognizedText, !text.isEmpty {
-                        // Flow 1: Text detected
-                        analysis = try await analyzer.analyzeIngredients(text)
-                    } else if let imageData = imageData {
-                        // Flow 2: No text detected, use image
-                        let base64String = imageData.base64EncodedString()
-                        let imageType = getImageType(from: imageData)
+                        let analysis = try await analyzer.analyzeIngredients(text)
                         
-                        let requestBody: [String: Any] = [
-                            "image": [
-                                "type": imageType,
-                                "data": base64String
-                            ]
-                        ]
-                        
-                        analysis = try await analyzer.analyzeIngredients(requestBody)
+                        await MainActor.run {
+                            analysisResult = analysis
+                            showingResults = true
+                        }
                     } else {
-                        throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to capture image or text"])
-                    }
-                    
-                    await MainActor.run {
-                        self.analysisResult = analysis
-                        self.showingResults = true
+                        throw NSError(domain: "", code: -1,
+                            userInfo: [NSLocalizedDescriptionKey: "No text was detected in the image. Please try capturing the ingredients text more clearly."])
                     }
                 } catch {
                     await MainActor.run {
-                        self.errorMessage = error.localizedDescription
-                        self.showingError = true
+                        errorMessage = error.localizedDescription
+                        showingError = true
                     }
                 }
             }
         }
     }
+}
+
+private func getImageType(from imageData: Data) -> String {
+    let bytes = [UInt8](imageData)
     
-    private func getImageType(from imageData: Data) -> String {
-        let bytes = [UInt8](imageData)
-        
-        if bytes.starts(with: [0xFF, 0xD8, 0xFF]) {
-            return "jpeg"
-        } else if bytes.starts(with: [0x89, 0x50, 0x4E, 0x47]) {
-            return "png"
-        } else if bytes.starts(with: [0x47, 0x49, 0x46, 0x38]) {
-            return "gif"
-        } else {
-            return "unknown"
-        }
+    if bytes.starts(with: [0xFF, 0xD8, 0xFF]) {
+        return "jpeg"
+    } else if bytes.starts(with: [0x89, 0x50, 0x4E, 0x47]) {
+        return "png"
+    } else if bytes.starts(with: [0x47, 0x49, 0x46, 0x38]) {
+        return "gif"
+    } else {
+        return "unknown"
     }
 }
