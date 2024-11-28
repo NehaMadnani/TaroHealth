@@ -37,10 +37,20 @@ struct ScannerView: View {
     
     var body: some View {
         ZStack {
+            // Camera Preview
             CameraPreviewView(scannerService: scannerService)
                 .edgesIgnoringSafeArea(.all)
             
+            // Flash animation overlay
+            if scannerService.isCapturing {
+                Color.white
+                    .opacity(0.3)
+                    .edgesIgnoringSafeArea(.all)
+                    .transition(.opacity)
+            }
+            
             VStack {
+                // Status text
                 Text("Camera: \(permissionStatus)")
                     .padding()
                     .background(Color.black.opacity(0.7))
@@ -50,15 +60,25 @@ struct ScannerView: View {
                 
                 Spacer()
                 
+                // Capture button
                 Button(action: handleCapture) {
-                    Circle()
-                        .fill(Color.white)
-                        .frame(width: 70, height: 70)
-                        .overlay(
-                            Circle()
-                                .stroke(Color.black.opacity(0.2), lineWidth: 2)
-                        )
+                    ZStack {
+                        Circle()
+                            .fill(Color.white)
+                            .frame(width: 70, height: 70)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.black.opacity(0.2), lineWidth: 2)
+                            )
+                        
+                        if scannerService.isCapturing {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .black))
+                                .scaleEffect(1.5)
+                        }
+                    }
                 }
+                .disabled(scannerService.isCapturing)
                 .padding(.bottom, 30)
             }
         }
@@ -126,7 +146,7 @@ struct ScannerView: View {
                         }
                     } else {
                         throw NSError(domain: "", code: -1,
-                            userInfo: [NSLocalizedDescriptionKey: "No text was detected in the image. Please try capturing the ingredients text more clearly."])
+                                      userInfo: [NSLocalizedDescriptionKey: "No text was detected in the image. Please try capturing the ingredients text more clearly."])
                     }
                 } catch {
                     await MainActor.run {
@@ -137,18 +157,18 @@ struct ScannerView: View {
             }
         }
     }
-}
-
-private func getImageType(from imageData: Data) -> String {
-    let bytes = [UInt8](imageData)
     
-    if bytes.starts(with: [0xFF, 0xD8, 0xFF]) {
-        return "jpeg"
-    } else if bytes.starts(with: [0x89, 0x50, 0x4E, 0x47]) {
-        return "png"
-    } else if bytes.starts(with: [0x47, 0x49, 0x46, 0x38]) {
-        return "gif"
-    } else {
-        return "unknown"
+    private func getImageType(from imageData: Data) -> String {
+        let bytes = [UInt8](imageData)
+        
+        if bytes.starts(with: [0xFF, 0xD8, 0xFF]) {
+            return "jpeg"
+        } else if bytes.starts(with: [0x89, 0x50, 0x4E, 0x47]) {
+            return "png"
+        } else if bytes.starts(with: [0x47, 0x49, 0x46, 0x38]) {
+            return "gif"
+        } else {
+            return "unknown"
+        }
     }
 }
